@@ -1,26 +1,15 @@
-// export const check = async (code: string): Promise<String> => {
-//   try {
 
-//     return "";
-//   } catch (error) {
-//     console.log('error', error);
-//     return "";
-//   }
-// };
-
-import { fileURLToPath } from 'url';
-import path from 'path';
+import { fileURLToPath } from "url";
+import path from "path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 // ...existing code...
 
+import { exec, spawn } from "child_process";
+import { writeFile, unlink, mkdir } from "fs/promises";
 
-
-import { exec, spawn } from 'child_process';
-import { writeFile, unlink, mkdir } from 'fs/promises';
-
-import { v4 as uuid } from 'uuid';
+import { v4 as uuid } from "uuid";
 
 /**
  * Compiles and runs a C++ code string.
@@ -28,19 +17,20 @@ import { v4 as uuid } from 'uuid';
  * @param input Optional standard input to be passed to the code.
  * @returns A promise that resolves to the standard output or an error message.
  */
-export const check = async (code: string, input: string = ''): Promise<string> => {
-    console.log('sumit')
-    const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-  const tempDir = path.join(__dirname, 'temp');
+const tempDir = path.join(__dirname, "temp");
+export const check = async (
+  code: string,
+  input: string = ""
+): Promise<string> => {
+  
+  
+  await mkdir(tempDir, { recursive: true });
   const jobId = uuid();
   const cppFilePath = path.join(tempDir, `${jobId}.cpp`);
   const outputFilePath = path.join(tempDir, `${jobId}.out`);
-
   try {
 
     // 1. Ensure the temporary directory exists.
-    await mkdir(tempDir, { recursive: true });
 
     // 2. Write the C++ code to a temporary file.
     await writeFile(cppFilePath, code);
@@ -48,7 +38,8 @@ const __dirname = path.dirname(__filename);
     // 3. Compile the code using g++.
     // We wrap the callback-based `exec` in a Promise for use with async/await.
     await new Promise<void>((resolve, reject) => {
-      exec(`g++ "${cppFilePath}" -o "${outputFilePath}"`, (error, stdout, stderr) => {
+
+      exec(`g++ -O2 -std=c++17 -I /opt/homebrew/Cellar/gcc/14.2.0_1/include/c++/14/aarch64-apple-darwin24 "${cppFilePath}" -o "${outputFilePath}"`, (error, stdout, stderr) => {
         if (error || stderr) {
           reject(new Error(stderr || error?.message));
         } else {
@@ -93,9 +84,9 @@ const __dirname = path.dirname(__filename);
       childProcess.stdin.write(input);
       childProcess.stdin.end();
     });
-
+    return "testing";
   } catch (error: any) {
-    console.log('error', error);
+    console.log("error", error);
     // This catches errors from file writing, compilation, or execution timeout.
     return error.message;
   } finally {

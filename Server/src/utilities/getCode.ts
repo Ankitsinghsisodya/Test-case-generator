@@ -20,9 +20,9 @@ export const getCode = async (
         contents: `${prompt}`,
         config: {
           thinkingConfig: {
-            // thinkingBudget: 1024,
+            thinkingBudget: 1024,
             // Turn off thinking:
-            thinkingBudget,
+            // thinkingBudget,
             // Turn on dynamic thinking:
             // thinkingBudget: -1
           },
