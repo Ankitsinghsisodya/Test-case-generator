@@ -46,12 +46,12 @@ function SignupPage() {
             })
 
             setShowOtpForm(true) // Show OTP form after successful signup
-        } catch (error) {
+        } catch (error: any) {
             console.log('Signup error:', error);
-            console.log(error.response.data.message)
+
             toast({
                 title: "Signup Failed",
-                description: error?.response.data.message,
+                description: error?.response?.data.message,
                 variant: "destructive",
             })
         } finally {
