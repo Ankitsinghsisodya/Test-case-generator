@@ -7,7 +7,7 @@ import jwt from "jsonwebtoken";
 import ApiResponse from "../utilities/ApiResponse.js";
 import dotenv from "dotenv";
 import { sendEmail } from "../utilities/sendOTP.js";
-import axios from 'axios'
+import axios, { type AxiosResponse } from "axios";
 dotenv.config();
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
@@ -23,7 +23,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!user) throw new ApiError(400, "User doesn't exist with this mail id");
-  if(!user.password)throw new ApiError(400, "First make an password")
+  if (!user.password) throw new ApiError(400, "First make an password");
   const isPasswordCorrect = await bcrypt.compare(password, user.password);
   if (!isPasswordCorrect) throw new ApiError(400, "Password is incorrect");
   const payload = {
@@ -107,7 +107,6 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
 
 export const getGoogleAuthURL = asyncHandler(
   async (req: Request, res: Response) => {
-
     const rootUrl = "https://accounts.google.com/o/oauth2/v2/auth";
     if (!process.env.SERVER_ROOT_URI || !process.env.GOOGLE_CLIENT_ID)
       throw new ApiError(400, "Some fields are missing");
@@ -188,7 +187,7 @@ export const googleCallback = asyncHandler(
       };
 
       const token = jwt.sign(payload, process.env.JWT_SECRET_KEY!, {
-        expiresIn: "7d",
+        expiresIn: "1d",
       });
 
       // Set cookie and redirect
@@ -196,7 +195,7 @@ export const googleCallback = asyncHandler(
         .cookie("token", token, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          maxAge: 1 * 24 * 60 * 60 * 1000, // 7 days
           sameSite: "lax",
         })
         .redirect(`${process.env.CLIENT_URL}/dashboard`);
@@ -240,3 +239,112 @@ async function getTokens({
     throw new Error(error.message);
   }
 }
+
+export const getGithubAuthURL = asyncHandler(
+  async (req: Request, res: Response) => {
+    const rootUrl = "https://github.com/login/oauth/authorize";
+
+    if (!process.env.SERVER_ROOT_URI || !process.env.GITHUB_CLIENT_ID)
+      throw new ApiError(400, "Some fields are missing");
+    const options = {
+      redirect_uri: `${process.env.SERVER_ROOT_URI}/api/auth/github/callback`,
+      client_id: process.env.GITHUB_CLIENT_ID,
+      scope: "user:email",
+      state: Math.random().toString(36).substring(7),
+    };
+
+    const qs = new URLSearchParams(options);
+    const authUrl = `${rootUrl}?${qs.toString()}`;
+
+    res.json(new ApiResponse(200, { authUrl }, "GitHub auth URL generated"));
+  }
+);
+
+export const githubCallback = asyncHandler(
+  async (req: Request, res: Response) => {
+    try {
+      const { code } = req.query;
+
+      if (!code) {
+        throw new ApiError(400, "Authorization code is required");
+      }
+      let token: AxiosResponse<{ access_token: string }> = await axios.post(
+        `https://github.com/login/oauth/access_token`,
+        {
+          client_id: process.env.GITHUB_CLIENT_ID,
+          client_secret: process.env.GITHUB_CLIENT_SECRET,
+          code: code,
+          redirect_uri: `${process.env.SERVER_ROOT_URI}/api/auth/github/callback`,
+        },
+        {
+          headers: {
+            Accept: "application/json", // This makes GitHub return JSON instead of query string
+          },
+        }
+      );
+      console.log("ankit");
+      const { access_token } = token.data;
+
+      // console.log('acces_token', access_token);
+
+      const response = await axios.get(`https://api.github.com/user`, {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      });
+
+      console.log("response", response.data);
+      // Get user emails (separate API call)
+      const emailResponse = await axios.get(
+        `https://api.github.com/user/emails`,
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            "User-Agent": "TestCaseExtension",
+          },
+        }
+      );
+      const { email, verified } = emailResponse.data[0];
+
+      // ✅ Should find primary verified email
+      const emails = emailResponse.data;
+      const primaryEmail = emails.find(
+        (email: any) => email.primary && email.verified
+      );
+
+      if (!primaryEmail) {
+        throw new ApiError(400, "No verified email found");
+      }
+      let user = await prisma.user.findFirst({
+        where: {
+          email,
+        },
+      });
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            email,
+            name: response.data.login,
+            picture: response.data.avatar_url || "",
+          },
+        });
+      }
+      const jwttoken = jwt.sign({ id: user.id }, process.env.JWT_SECRET_KEY!, {
+        expiresIn: "1d",
+      });
+
+      return res
+        .cookie("token", jwttoken, {
+          sameSite: "lax",
+          httpOnly: true,
+          secure: false,
+          maxAge: 1 * 24 * 60 * 60 * 1000,
+        })
+        .status(200)
+        .redirect(`${process.env.CLIENT_URL}/`);
+    } catch (error) {
+      console.error("GitHub OAuth error:", error);
+      res.redirect(`${process.env.CLIENT_URL}/signin?error=github_auth_failed`);
+    }
+  }
+);
