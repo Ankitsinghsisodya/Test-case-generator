@@ -84,7 +84,7 @@ export const check = async (
       childProcess.stdin.write(input);
       childProcess.stdin.end();
     });
-    return "testing";
+
   } catch (error: any) {
     console.log("error", error);
     // This catches errors from file writing, compilation, or execution timeout.

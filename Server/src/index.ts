@@ -2,11 +2,18 @@ import express, { urlencoded } from "express";
 import dotenv from "dotenv";
 import type { Request, Response } from "express";
 import { getTestCase } from "./controller/getTestCase.js";
+import authRoute from './routes/auth.route.js'
+import cors from 'cors'
+import {job} from './jobs/cronJobs.js';
+import { errorHandlingMiddleware } from "./middleware.ts/error.middleware.js";
 dotenv.config();
 
 const app = express();
+app.use(cors())
 app.use(urlencoded({ extended: true }));
 app.use(express.json());
+app.use('/api/auth', authRoute)
+app.use(errorHandlingMiddleware);
 
 app.get("/", (req: Request, res: Response) => {
   return res.json({
