@@ -7,6 +7,7 @@ import jwt from "jsonwebtoken";
 import ApiResponse from "../utilities/ApiResponse.js";
 import dotenv from "dotenv";
 import { sendEmail } from "../utilities/sendOTP.js";
+import axios from 'axios'
 dotenv.config();
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
@@ -22,6 +23,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (!user) throw new ApiError(400, "User doesn't exist with this mail id");
+  if(!user.password)throw new ApiError(400, "First make an password")
   const isPasswordCorrect = await bcrypt.compare(password, user.password);
   if (!isPasswordCorrect) throw new ApiError(400, "Password is incorrect");
   const payload = {
@@ -59,14 +61,13 @@ export const signup = asyncHandler(async (req: Request, res: Response) => {
   const otp = Math.floor(10000 + Math.random() * 90000);
 
   await prisma.otp.create({
-     data: {
-       email,
-       otp,
-     },
-   });
+    data: {
+      email,
+      otp,
+    },
+  });
   const emailResult = await sendEmail(email, otp);
-   if(!emailResult.success)
-        throw new ApiError(500, "failed to send the mail")
+  if (!emailResult.success) throw new ApiError(500, "failed to send the mail");
   res.json(new ApiResponse(200, {}, "OTP Sent Successfully"));
 });
 
@@ -103,3 +104,139 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
     })
     .json(new ApiResponse(200, {}, "User successfully created"));
 });
+
+export const getGoogleAuthURL = asyncHandler(
+  async (req: Request, res: Response) => {
+
+    const rootUrl = "https://accounts.google.com/o/oauth2/v2/auth";
+    if (!process.env.SERVER_ROOT_URI || !process.env.GOOGLE_CLIENT_ID)
+      throw new ApiError(400, "Some fields are missing");
+    const options = {
+      redirect_uri: `${process.env.SERVER_ROOT_URI}/api/auth/google/callback`,
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      access_type: "offline",
+      response_type: "code",
+      scope: [
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/userinfo.email",
+      ].join(" "),
+    };
+
+    const qs = new URLSearchParams(options);
+    const authUrl = `${rootUrl}?${qs.toString()}`;
+
+    res.json(new ApiResponse(200, { authUrl }, "Google auth URL generated"));
+  }
+);
+
+export const googleCallback = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { code } = req.query;
+
+    if (!code) {
+      throw new ApiError(400, "Authorization code is required");
+    }
+
+    try {
+      // Get tokens from Google
+      const tokens = await getTokens({
+        code: code as string,
+        clientId: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        redirectUri: `${process.env.SERVER_ROOT_URI}/api/auth/google/callback`,
+      });
+
+      // Get user info from Google
+      const googleUser = await axios
+        .get(
+          `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${tokens.access_token}`,
+          {
+            headers: { Authorization: `Bearer ${tokens.id_token}` },
+          }
+        )
+        .then((res) => res.data);
+
+      // Check if user exists in database
+      let user = await prisma.user.findFirst({
+        where: {
+          OR: [{ email: googleUser.email }, { googleId: googleUser.id }],
+        },
+      });
+
+      // If user doesn't exist, create new user
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            name: googleUser.name,
+            email: googleUser.email,
+            googleId: googleUser.id,
+            picture: googleUser.picture,
+            password: null, // No password for Google users
+          },
+        });
+      } else if (!user.googleId) {
+        // If user exists but doesn't have googleId, update it
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { googleId: googleUser.id },
+        });
+      }
+
+      // Create JWT token
+      const payload = {
+        id: user.id,
+      };
+
+      const token = jwt.sign(payload, process.env.JWT_SECRET_KEY!, {
+        expiresIn: "7d",
+      });
+
+      // Set cookie and redirect
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+          sameSite: "lax",
+        })
+        .redirect(`${process.env.CLIENT_URL}/dashboard`);
+    } catch (error) {
+      console.error("Google OAuth error:", error);
+      res.redirect(`${process.env.CLIENT_URL}/signin?error=google_auth_failed`);
+    }
+  }
+);
+
+// Helper function for getting tokens
+async function getTokens({
+  code,
+  clientId,
+  clientSecret,
+  redirectUri,
+}: {
+  code: string;
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+}) {
+  const url = "https://oauth2.googleapis.com/token";
+  const values = {
+    code,
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: redirectUri,
+    grant_type: "authorization_code",
+  };
+
+  try {
+    const res = await axios.post(url, new URLSearchParams(values), {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+    return res.data;
+  } catch (error: any) {
+    console.error("Failed to fetch auth tokens:", error.response?.data?.error);
+    throw new Error(error.message);
+  }
+}

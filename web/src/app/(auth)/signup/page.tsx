@@ -101,9 +101,28 @@ function SignupPage() {
         }
     }
 
-    const handleGoogleAuth = () => {
-        console.log('Google authentication initiated')
-    }
+    const handleGoogleAuth = async () => {
+        try {
+            setIsLoading(true);
+
+            // Get Google OAuth URL from your backend
+            const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/google/url`);
+            const { authUrl } = response.data.data;
+
+            // Redirect to Google OAuth
+            window.location.href = authUrl;
+        } catch (error: any) {
+            console.error('Google OAuth error:', error);
+
+            toast({
+                title: "Authentication Failed",
+                description: error.response?.data?.message || "Failed to initialize Google authentication",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
