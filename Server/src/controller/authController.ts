@@ -171,13 +171,16 @@ export const googleCallback = asyncHandler(
             googleId: googleUser.id,
             picture: googleUser.picture,
             password: null, // No password for Google users
+        
           },
         });
-      } else if (!user.googleId) {
+      } else if (!user.googleId || !user.picture) {
         // If user exists but doesn't have googleId, update it
         user = await prisma.user.update({
           where: { id: user.id },
-          data: { googleId: googleUser.id },
+          data: { googleId: googleUser.id ,
+            picture: googleUser.picture || user.picture
+          },
         });
       }
 
@@ -198,7 +201,7 @@ export const googleCallback = asyncHandler(
           maxAge: 1 * 24 * 60 * 60 * 1000, // 7 days
           sameSite: "lax",
         })
-        .redirect(`${process.env.CLIENT_URL}/dashboard`);
+        .redirect(`${process.env.CLIENT_URL}`);
     } catch (error) {
       console.error("Google OAuth error:", error);
       res.redirect(`${process.env.CLIENT_URL}/signin?error=google_auth_failed`);
@@ -282,7 +285,7 @@ export const githubCallback = asyncHandler(
           },
         }
       );
-      console.log("ankit");
+
       const { access_token } = token.data;
 
       // console.log('acces_token', access_token);
@@ -293,7 +296,7 @@ export const githubCallback = asyncHandler(
         },
       });
 
-      console.log("response", response.data);
+
       // Get user emails (separate API call)
       const emailResponse = await axios.get(
         `https://api.github.com/user/emails`,
@@ -317,17 +320,26 @@ export const githubCallback = asyncHandler(
       }
       let user = await prisma.user.findFirst({
         where: {
-          email,
+          email: primaryEmail.email,
         },
       });
       if (!user) {
         user = await prisma.user.create({
           data: {
-            email,
+            email:primaryEmail.email,
             name: response.data.login,
             picture: response.data.avatar_url || "",
           },
         });
+      }
+      else {
+        user = await prisma.user.update({
+            where:{
+                email : primaryEmail.email
+            },data:{
+                 picture: response.data.avatar_url || user.picture ||"",
+            }
+        })
       }
       const jwttoken = jwt.sign({ id: user.id }, process.env.JWT_SECRET_KEY!, {
         expiresIn: "1d",
@@ -348,3 +360,16 @@ export const githubCallback = asyncHandler(
     }
   }
 );
+
+export const logout = asyncHandler(async (req: Request, res: Response) => {
+  return res
+    .status(200)
+    .clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    })
+    .json(new ApiResponse(200, {}, "Logout successful"));
+});
+
+

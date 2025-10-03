@@ -1,21 +1,37 @@
-import express, { urlencoded } from "express";
+import cookieParser from "cookie-parser";
+import cors from "cors";
 import dotenv from "dotenv";
 import type { Request, Response } from "express";
+import express, { urlencoded } from "express";
 import { getTestCase } from "./controller/getTestCase.js";
-import authRoute from './routes/auth.route.js'
-import cors from 'cors'
-import {job} from './jobs/cronJobs.js';
-import cookieParser from 'cookie-parser'
 import { errorHandlingMiddleware } from "./middleware.ts/error.middleware.js";
+import authRoute from "./routes/auth.route.js";
+import userRoute from "./routes/user.route.js";
 dotenv.config();
 
 const app = express();
-app.use(cors())
+
+// Cookie parser MUST be before routes that use cookies
+app.use(cookieParser());
+
+// Body parsing middleware
 app.use(urlencoded({ extended: true }));
 app.use(express.json());
-app.use('/api/auth', authRoute)
+
+// CORS configuration - allow credentials
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  })
+);
+
+// Routes
+app.use("/api/auth", authRoute);
+app.use("/api/user", userRoute);
+
+// Error handling middleware should be last
 app.use(errorHandlingMiddleware);
-app.use(cookieParser());
 
 app.get("/", (req: Request, res: Response) => {
   return res.json({
@@ -27,5 +43,3 @@ app.post("/getTestCase", getTestCase);
 app.listen(process.env.PORT, () => {
   console.log(`Server is listening on the ${process.env.PORT} PORT`);
 });
-
-
