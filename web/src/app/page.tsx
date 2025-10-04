@@ -20,6 +20,7 @@ export default function Home() {
   const router = useRouter()
 
   // Fetch current user data
+
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
@@ -33,8 +34,8 @@ export default function Home() {
 
         console.log('User response:', response.data)
 
-        if (response.status === 200 && response.data.data) {
-          setUser(response.data.data)
+        if (response.status === 200 && response.data) {
+          setUser(() => response.data.data)
           console.log('User set:', response.data.data)
         } else {
           console.log('No user data found, redirecting to signin')
@@ -207,7 +208,7 @@ export default function Home() {
   if (!user) {
     return null // This should not happen due to redirect, but just in case
   }
-
+  console.log(user);
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
@@ -227,7 +228,7 @@ export default function Home() {
                 />
                 <div className="text-left hidden sm:block">
                   <p className="text-sm font-medium text-emerald-800">{user.name || 'User'}</p>
-                  <p className="text-xs text-emerald-600">{user.email}</p>
+                  {/* <p className="text-xs text-emerald-600">{user.email}</p> */}
                 </div>
                 <svg
                   className={`w-4 h-4 text-emerald-600 transition-transform ${showUserMenu ? 'rotate-180' : ''}`}
@@ -242,36 +243,20 @@ export default function Home() {
               {/* Dropdown Menu */}
               {showUserMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-emerald-200 py-2 z-10">
-                  <div className="px-4 py-2 border-b border-emerald-100">
+                  {/* <div className="px-4 py-2 border-b border-emerald-100">
                     <p className="text-sm font-medium text-emerald-800">{user.name || 'User'}</p>
                     <p className="text-xs text-emerald-600">{user.email}</p>
-                  </div>
+                  </div> */}
                   <button
                     onClick={() => {
                       setShowUserMenu(false)
-                      toast({
-                        title: 'Profile',
-                        description: 'Profile functionality coming soon!',
-                        variant: 'default'
-                      })
+                      router.push('/profile')
                     }}
                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-800"
                   >
                     Profile Settings
                   </button>
-                  <button
-                    onClick={() => {
-                      setShowUserMenu(false)
-                      toast({
-                        title: 'Settings',
-                        description: 'Settings functionality coming soon!',
-                        variant: 'default'
-                      })
-                    }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-800"
-                  >
-                    Account Settings
-                  </button>
+
                   <hr className="my-1 border-emerald-100" />
                   <button
                     onClick={() => {
