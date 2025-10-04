@@ -19,3 +19,4 @@ Server/.env
 # Temporary files
 temp/
 *.tmp
+Server/rzp.numbers
