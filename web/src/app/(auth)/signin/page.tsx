@@ -14,12 +14,10 @@ function SigninPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        console.log('Login attempted with:', { email, password })
         try {
             const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/login`, {
                 email, password
             })
-            console.log('Login successful:', response.data)
 
             toast({
                 title: "Welcome back!",
@@ -28,8 +26,6 @@ function SigninPage() {
             })
 
         } catch (error) {
-            console.log('Login error:', error);
-
             toast({
                 title: "Login Failed",
                 description: "Invalid email or password. Please try again.",
@@ -47,8 +43,6 @@ function SigninPage() {
 
             window.location.href = authUrl;
         } catch (error: any) {
-            console.error('Google OAuth error:', error);
-
             toast({
                 title: "Authentication Failed",
                 description: error.response?.data?.message || "Failed to initialize Google authentication",
@@ -68,8 +62,6 @@ function SigninPage() {
 
             window.location.href = authUrl;
         } catch (error: any) {
-            console.error('GitHub OAuth error:', error);
-
             toast({
                 title: "Authentication Failed",
                 description: error.response?.data?.message || "Failed to initialize GitHub authentication",

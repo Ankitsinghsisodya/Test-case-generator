@@ -24,7 +24,6 @@ export default function Home() {
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
-        console.log('Fetching current user...')
         const response = await axios.get(
           `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/api/user/getCurrentUser`,
           {
@@ -32,18 +31,12 @@ export default function Home() {
           }
         )
 
-        console.log('User response:', response.data)
-
         if (response.status === 200 && response.data) {
           setUser(() => response.data.data)
-          console.log('User set:', response.data.data)
         } else {
-          console.log('No user data found, redirecting to signin')
           router.push('/signin')
         }
       } catch (error: any) {
-        console.error('Failed to fetch user:', error)
-
         if (error.response?.status === 401) {
           toast({
             title: 'Session Expired',
@@ -103,8 +96,6 @@ export default function Home() {
         router.push('/signin')
       }
     } catch (error: any) {
-      console.error('Logout error:', error)
-
       // Even if API call fails, still redirect (cookie might be expired)
       toast({
         title: 'Logged out',
@@ -173,7 +164,6 @@ export default function Home() {
         setResult(`Error: ${JSON.stringify(response.data.error)}`)
       }
     } catch (error) {
-      console.error('Error:', error)
       toast({
         title: 'Error',
         description: 'Failed to connect to server',
@@ -208,7 +198,7 @@ export default function Home() {
   if (!user) {
     return null // This should not happen due to redirect, but just in case
   }
-  console.log(user);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">

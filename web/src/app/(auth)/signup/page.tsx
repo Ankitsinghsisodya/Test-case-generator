@@ -31,13 +31,11 @@ function SignupPage() {
             return
         }
 
-        console.log('Signup attempted with:', { email, name, password })
         try {
             const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/signup`, {
                 email, name, password
             })
             // after here otp is sent 
-            console.log('Signup successful:', response.data)
 
             toast({
                 title: "OTP Sent!",
@@ -47,8 +45,6 @@ function SignupPage() {
 
             setShowOtpForm(true) // Show OTP form after successful signup
         } catch (error: any) {
-            console.log('Signup error:', error);
-
             toast({
                 title: "Signup Failed",
                 description: error?.response?.data.message,
@@ -78,8 +74,6 @@ function SignupPage() {
                 email, name, password, otp
             })
 
-            console.log('OTP verification successful:', response.data)
-
             toast({
                 title: "Account Created!",
                 description: "Your account has been created successfully.",
@@ -89,8 +83,6 @@ function SignupPage() {
             // Redirect to dashboard or home page
             router.push('/')
         } catch (error) {
-            console.log('OTP verification error:', error);
-
             toast({
                 title: "Verification Failed",
                 description: "Invalid OTP. Please try again.",
@@ -112,8 +104,6 @@ function SignupPage() {
             // Redirect to Google OAuth
             window.location.href = authUrl;
         } catch (error: any) {
-            console.error('Google OAuth error:', error);
-
             toast({
                 title: "Authentication Failed",
                 description: error.response?.data?.message || "Failed to initialize Google authentication",
@@ -135,8 +125,6 @@ function SignupPage() {
             // Redirect to GitHub OAuth
             window.location.href = authUrl;
         } catch (error: any) {
-            console.error('GitHub OAuth error:', error);
-
             toast({
                 title: "Authentication Failed",
                 description: error.response?.data?.message || "Failed to initialize GitHub authentication",
