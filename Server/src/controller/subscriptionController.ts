@@ -9,6 +9,7 @@ import ApiResponse from "../utilities/ApiResponse.js";
 const price: number = 100;
 export const createOrder = asyncHandler(async (req: Request, res: Response) => {
   const { month, currency } = req.body;
+  console.log('createOrder')
   const { id } = req;
   if (!id || !month) throw new ApiError(400, "some fields are missing");
   const receipt = `receipt_${Date.now()}`;
@@ -20,6 +21,7 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
       currency,
     },
   });
+  console.log('ankit')
   const order = await instance.orders.create({
     amount: Math.round(price * 100),
     currency: "INR",
@@ -29,7 +31,7 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
       userId: id,
     },
   });
-
+  console.log('temp');
   const updatedSubscription = await prisma.$transaction(async (tx) => {
     const updated = await tx.subscription.update({
       where: {
@@ -42,7 +44,7 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
     });
     return updated;
   });
-
+  console.log('upadted subscription', updatedSubscription);
   return res.status(200).json(
     new ApiResponse(
       200,

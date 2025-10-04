@@ -1,13 +1,13 @@
-import type { Request, Response } from "express";
-import asyncHandler from "../utilities/asynchandler.js";
-import ApiError from "../utilities/ApiError.js";
-import { prisma } from "../utilities/prisma.js";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import ApiResponse from "../utilities/ApiResponse.js";
-import dotenv from "dotenv";
-import { sendEmail } from "../utilities/sendOTP.js";
 import axios, { type AxiosResponse } from "axios";
+import bcrypt from "bcrypt";
+import dotenv from "dotenv";
+import type { Request, Response } from "express";
+import jwt from "jsonwebtoken";
+import ApiError from "../utilities/ApiError.js";
+import ApiResponse from "../utilities/ApiResponse.js";
+import asyncHandler from "../utilities/asynchandler.js";
+import { prisma } from "../utilities/prisma.js";
+import { sendEmail } from "../utilities/sendOTP.js";
 dotenv.config();
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
@@ -30,14 +30,15 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     id: user.id,
   };
   const token = jwt.sign(payload, process.env.JWT_SECRET_KEY!);
+  console.log("token", token);
   return res
     .cookie("token", token, {
-      sameSite: "strict",
+      sameSite: "lax",
       httpOnly: true,
       secure: false,
     })
     .status(200)
-    .json(new ApiResponse(200, {}, "successfully login"));
+    .json(new ApiResponse(200, token, "successfully login"));
 });
 
 export const signup = asyncHandler(async (req: Request, res: Response) => {
@@ -98,7 +99,7 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
   res
     .status(200)
     .cookie("token", token, {
-      sameSite: "strict",
+      sameSite: "lax",
       httpOnly: true,
       secure: false,
     })
@@ -171,15 +172,15 @@ export const googleCallback = asyncHandler(
             googleId: googleUser.id,
             picture: googleUser.picture,
             password: null, // No password for Google users
-        
           },
         });
       } else if (!user.googleId || !user.picture) {
         // If user exists but doesn't have googleId, update it
         user = await prisma.user.update({
           where: { id: user.id },
-          data: { googleId: googleUser.id ,
-            picture: googleUser.picture || user.picture
+          data: {
+            googleId: googleUser.id,
+            picture: googleUser.picture || user.picture,
           },
         });
       }
@@ -296,7 +297,6 @@ export const githubCallback = asyncHandler(
         },
       });
 
-
       // Get user emails (separate API call)
       const emailResponse = await axios.get(
         `https://api.github.com/user/emails`,
@@ -326,20 +326,20 @@ export const githubCallback = asyncHandler(
       if (!user) {
         user = await prisma.user.create({
           data: {
-            email:primaryEmail.email,
+            email: primaryEmail.email,
             name: response.data.login,
             picture: response.data.avatar_url || "",
           },
         });
-      }
-      else {
+      } else {
         user = await prisma.user.update({
-            where:{
-                email : primaryEmail.email
-            },data:{
-                 picture: response.data.avatar_url || user.picture ||"",
-            }
-        })
+          where: {
+            email: primaryEmail.email,
+          },
+          data: {
+            picture: response.data.avatar_url || user.picture || "",
+          },
+        });
       }
       const jwttoken = jwt.sign({ id: user.id }, process.env.JWT_SECRET_KEY!, {
         expiresIn: "1d",
@@ -371,5 +371,3 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
     })
     .json(new ApiResponse(200, {}, "Logout successful"));
 });
-
-

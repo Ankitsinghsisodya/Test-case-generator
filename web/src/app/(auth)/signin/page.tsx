@@ -17,8 +17,10 @@ function SigninPage() {
         try {
             const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/login`, {
                 email, password
+            }, {
+                withCredentials: true, // Important: Include cookies in the request
             })
-
+            console.log('response', response.data.data);
             toast({
                 title: "Welcome back!",
                 description: "You have been signed in successfully.",
@@ -38,7 +40,9 @@ function SigninPage() {
         try {
             setIsLoading(true);
 
-            const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/google/url`);
+            const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/google/url`, {
+                withCredentials: true
+            });
             const { authUrl } = response.data.data;
 
             window.location.href = authUrl;
@@ -57,7 +61,9 @@ function SigninPage() {
         try {
             setIsLoading(true);
 
-            const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/github/url`);
+            const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/github/url`, {
+                withCredentials: true
+            });
             const { authUrl } = response.data.data;
 
             window.location.href = authUrl;

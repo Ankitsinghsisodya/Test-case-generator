@@ -7,6 +7,7 @@ import { getTestCase } from "./controller/getTestCase.js";
 import { errorHandlingMiddleware } from "./middleware.ts/error.middleware.js";
 import authRoute from "./routes/auth.route.js";
 import userRoute from "./routes/user.route.js";
+import subsriptionRoute from "./routes/subscription.route.js";
 dotenv.config();
 
 const app = express();
@@ -29,6 +30,7 @@ app.use(
 // Routes
 app.use("/api/auth", authRoute);
 app.use("/api/user", userRoute);
+app.use("/api/subscription", subsriptionRoute);
 
 // Error handling middleware should be last
 app.use(errorHandlingMiddleware);

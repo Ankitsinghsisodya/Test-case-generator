@@ -34,6 +34,8 @@ function SignupPage() {
         try {
             const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/signup`, {
                 email, name, password
+            }, {
+                withCredentials: true
             })
             // after here otp is sent 
 
@@ -72,6 +74,8 @@ function SignupPage() {
         try {
             const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/verifyOTP`, {
                 email, name, password, otp
+            }, {
+                withCredentials: true
             })
 
             toast({
