@@ -31,10 +31,10 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     id: user.id,
   };
   const token = jwt.sign(payload, process.env.JWT_SECRET_KEY!);
-  
+
   return res
     .cookie("token", token, {
-      sameSite: "lax",
+      sameSite: "none",
       httpOnly: true,
       secure: true,
     })
@@ -100,7 +100,7 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
   res
     .status(200)
     .cookie("token", token, {
-      sameSite: "lax",
+      sameSite: "none",
       httpOnly: true,
       secure: true,
     })
@@ -201,7 +201,7 @@ export const googleCallback = asyncHandler(
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           maxAge: 1 * 24 * 60 * 60 * 1000, // 7 days
-          sameSite: "lax",
+          sameSite: "none",
         })
         .redirect(`${process.env.CLIENT_URL}`);
     } catch (error) {
@@ -348,7 +348,7 @@ export const githubCallback = asyncHandler(
 
       return res
         .cookie("token", jwttoken, {
-          sameSite: "lax",
+          sameSite: "none",
           httpOnly: true,
           secure: true,
           maxAge: 1 * 24 * 60 * 60 * 1000,
@@ -368,7 +368,7 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
     .clearCookie("token", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "none",
     })
     .json(new ApiResponse(200, {}, "Logout successful"));
 });
