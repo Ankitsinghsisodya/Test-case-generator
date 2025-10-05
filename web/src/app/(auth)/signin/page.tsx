@@ -2,10 +2,12 @@
 'use client'
 import { useToast } from "@/components/ui/toast"
 import axios from 'axios'
+import { useRouter } from "next/navigation"
 import { useState } from 'react'
 
 
 function SigninPage() {
+    const router = useRouter();
     const { toast } = useToast()
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
@@ -26,6 +28,7 @@ function SigninPage() {
                 description: "You have been signed in successfully.",
                 variant: "success",
             })
+            router.push('/')
 
         } catch (error) {
             toast({

@@ -16,7 +16,7 @@ export const authMiddleware = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
 
     const token = req.cookies.token;    
-    console.log('token', token);
+
     if (!token) throw new ApiError(401, "Unauthorized access");
     if (!process.env.JWT_SECRET_KEY)
       throw new ApiError(400, "JWT secret key not found");

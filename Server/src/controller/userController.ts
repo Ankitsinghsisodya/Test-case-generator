@@ -11,6 +11,8 @@ export const getCurrentUser = asyncHandler(
     const userId = req.id;
 
     if (!userId) throw new ApiError(400, "User not found");
+
+    // Get user with subscription information
     const user = await prisma.user.findFirst({
       where: {
         id: userId,
@@ -19,8 +21,11 @@ export const getCurrentUser = asyncHandler(
         name: true,
         email: true,
         picture: true,
+        isPremium: true,
+        premiumExpiresAt: true,
       },
     });
+
     return res.status(200).json(new ApiResponse(200, user, "user information"));
   }
 );
@@ -46,15 +51,15 @@ export const updateUserDetails = asyncHandler(
       picture = response.secure_url;
     }
     // Clean up local file after successful upload
-    if(file)
-    try {
-      if (fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
-        console.log(`Local file cleaned up: ${file.path}`);
+    if (file)
+      try {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+          console.log(`Local file cleaned up: ${file.path}`);
+        }
+      } catch (cleanupError) {
+        console.error("Failed to delete local file:", cleanupError);
       }
-    } catch (cleanupError) {
-      console.error("Failed to delete local file:", cleanupError);
-    }
     const updatedUser = await prisma.user.update({
       where: {
         id: userId,
@@ -64,7 +69,6 @@ export const updateUserDetails = asyncHandler(
         picture: picture,
       },
     });
-
 
     return res
       .status(200)

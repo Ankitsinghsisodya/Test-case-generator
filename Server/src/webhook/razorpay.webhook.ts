@@ -8,9 +8,17 @@ import ApiResponse from "../utilities/ApiResponse.js";
 
 export const handleRazorpayWebhook = asyncHandler(
   async (req: Request, res: Response) => {
-    console.log('req', req);
+    // console.log('req', req);
     const signature = req.headers["x-razorpay-signature"] as string;
-    const body = req.body;
+      let body: Buffer;
+    if (Buffer.isBuffer(req.body)) {
+      body = req.body;
+    } else if (typeof req.body === "string") {
+      body = Buffer.from(req.body, "utf8");
+    } else {
+      // Worst-case fallback if req.body is parsed JSON (not ideal) — canonicalize
+      body = Buffer.from(JSON.stringify(req.body), "utf8");
+    }
 
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET!)
@@ -34,6 +42,7 @@ export const handleRazorpayWebhook = asyncHandler(
 const handlePaymentCaptured = async (payload: any) => {
 
   const payment = payload.payment.entity;
+  console.log('payload-payment',payload.payment);
   const orderId = payment.order._id;
   const paymentId = payment.id;
   const amount = payment.amount / 100;

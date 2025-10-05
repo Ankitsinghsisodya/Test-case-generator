@@ -30,7 +30,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     id: user.id,
   };
   const token = jwt.sign(payload, process.env.JWT_SECRET_KEY!);
-  console.log("token", token);
+  
   return res
     .cookie("token", token, {
       sameSite: "lax",

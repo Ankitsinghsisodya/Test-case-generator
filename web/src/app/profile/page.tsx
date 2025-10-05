@@ -5,11 +5,74 @@ import axios from 'axios'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 
+// Declare Razorpay type for TypeScript
+declare global {
+    interface Window {
+        Razorpay: any;
+    }
+}
+
 interface User {
     name: string;
     email: string;
     picture: string;
+    isPremium?: boolean;
+    premiumExpiresAt?: string;
 }
+
+interface SubscriptionPlan {
+    id: string;
+    name: string;
+    months: number;
+    price: number;
+    originalPrice?: number;
+    features: string[];
+    popular?: boolean;
+}
+
+const subscriptionPlans: SubscriptionPlan[] = [
+    {
+        id: 'monthly',
+        name: 'Monthly',
+        months: 1,
+        price: 100,
+        features: [
+            'Standard AI Analysis',
+            'Advanced AI Analysis',
+            'Unlimited Test Cases',
+            'Priority Support'
+        ]
+    },
+    {
+        id: 'semi-annual',
+        name: '6 Months',
+        months: 6,
+        price: 500,
+        originalPrice: 600,
+        features: [
+            'Standard AI Analysis',
+            'Advanced AI Analysis',
+            'Unlimited Test Cases',
+            'Priority Support',
+            '2 Months Free'
+        ],
+        popular: true
+    },
+    {
+        id: 'annual',
+        name: 'Annual',
+        months: 12,
+        price: 900,
+        originalPrice: 1200,
+        features: [
+            'Standard AI Analysis',
+            'Advanced AI Analysis',
+            'Unlimited Test Cases',
+            'Priority Support',
+            '3 Months Free'
+        ]
+    }
+]
 
 export default function Profile() {
     const [user, setUser] = useState<User | null>(null)
@@ -20,6 +83,9 @@ export default function Profile() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [uploadProgress, setUploadProgress] = useState(0)
+    const [isProcessingPayment, setIsProcessingPayment] = useState(false)
+    const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
+    const [isRazorpayLoaded, setIsRazorpayLoaded] = useState(false)
     const { toast } = useToast()
     const router = useRouter()
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -60,6 +126,20 @@ export default function Profile() {
 
         fetchCurrentUser()
     }, [router, toast])
+
+    // Check if Razorpay script is loaded
+    useEffect(() => {
+        const checkRazorpay = () => {
+            if (window.Razorpay) {
+                setIsRazorpayLoaded(true)
+            } else {
+                // Check again after a short delay
+                setTimeout(checkRazorpay, 500)
+            }
+        }
+
+        checkRazorpay()
+    }, [])
 
     // Handle file selection
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -197,6 +277,117 @@ export default function Profile() {
         if (fileInputRef.current) {
             fileInputRef.current.value = ''
         }
+    }
+
+    // Handle subscription purchase
+    const handleSubscriptionPurchase = async (plan: SubscriptionPlan) => {
+        // Check if Razorpay is loaded first
+        if (!isRazorpayLoaded || !window.Razorpay) {
+            toast({
+                title: 'Payment Error',
+                description: 'Payment gateway is still loading. Please wait a moment and try again.',
+                variant: 'destructive'
+            })
+            return
+        }
+
+        setIsProcessingPayment(true)
+        setSelectedPlan(plan.id)
+
+        try {
+            // Create order on backend
+            const orderResponse = await axios.post(
+                `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/subscription/createOrder`,
+                {
+                    month: plan.months,
+                    currency: 'INR'
+                },
+                {
+                    withCredentials: true
+                }
+            )
+
+            const { orderId, amount, currency } = orderResponse.data.data
+
+            // Initialize Razorpay
+            const options = {
+                key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_your_key_id',
+                amount: amount,
+                currency: currency,
+                name: 'Test Case Generator',
+                description: `${plan.name} Subscription`,
+                order_id: orderId,
+                handler: async function (response: any) {
+                    try {
+                        // Verify payment on backend
+                        const verifyResponse = await axios.post(
+                            `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/subscription/verifyPayment`,
+                            {
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature
+                            },
+                            {
+                                withCredentials: true
+                            }
+                        )
+
+                        if (verifyResponse.status === 200) {
+                            toast({
+                                title: 'Payment Successful!',
+                                description: `You have successfully subscribed to the ${plan.name} plan.`,
+                                variant: 'default'
+                            })
+
+                            // Refresh user data to show premium status
+                            window.location.reload()
+                        }
+                    } catch (error: any) {
+                        toast({
+                            title: 'Payment Verification Failed',
+                            description: error.response?.data?.message || 'Please contact support.',
+                            variant: 'destructive'
+                        })
+                    }
+                },
+                prefill: {
+                    name: user?.name,
+                    email: user?.email
+                },
+                theme: {
+                    color: '#059669'
+                },
+                modal: {
+                    ondismiss: function () {
+                        setIsProcessingPayment(false)
+                        setSelectedPlan(null)
+                    }
+                }
+            }
+
+            // @ts-ignore
+            const rzp = new window.Razorpay(options)
+            rzp.open()
+
+        } catch (error: any) {
+            toast({
+                title: 'Payment Failed',
+                description: error.response?.data?.message || 'Failed to initiate payment.',
+                variant: 'destructive'
+            })
+        } finally {
+            setIsProcessingPayment(false)
+            setSelectedPlan(null)
+        }
+    }
+
+    // Format date for subscription expiry
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        })
     }
 
     // Loading state
@@ -353,6 +544,174 @@ export default function Profile() {
                             </button>
                         </div>
                     </form>
+                </div>
+
+                {/* Subscription Section */}
+                <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-emerald-200 mt-8">
+                    <div className="text-center mb-6">
+                        <h2 className="text-2xl font-bold text-emerald-800 mb-2">
+                            Subscription Management
+                        </h2>
+                        <p className="text-emerald-600">
+                            Manage your premium subscription
+                        </p>
+                    </div>
+
+                    {/* Current Status */}
+                    <div className="mb-8 p-4 rounded-lg border-2 border-emerald-200 bg-emerald-50">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-semibold text-emerald-800">
+                                    Current Status
+                                </h3>
+                                <p className="text-emerald-600">
+                                    {user.isPremium ? (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 mr-2">
+                                                Premium Active
+                                            </span>
+                                            {user.premiumExpiresAt && (
+                                                <span className="text-sm">
+                                                    Expires on {formatDate(user.premiumExpiresAt)}
+                                                </span>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                            Free Plan
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+                            {user.isPremium && (
+                                <div className="text-emerald-600">
+                                    <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Subscription Plans */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {subscriptionPlans.map((plan) => (
+                            <div
+                                key={plan.id}
+                                className={`relative rounded-lg border-2 p-6 ${plan.popular
+                                        ? 'border-emerald-500 bg-emerald-50'
+                                        : 'border-gray-200 bg-white'
+                                    } hover:shadow-lg transition-shadow`}
+                            >
+                                {plan.popular && (
+                                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-500 text-white">
+                                            Most Popular
+                                        </span>
+                                    </div>
+                                )}
+
+                                <div className="text-center">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                                        {plan.name}
+                                    </h3>
+
+                                    <div className="mb-4">
+                                        <span className="text-3xl font-bold text-gray-900">
+                                            ₹{plan.price}
+                                        </span>
+                                        {plan.originalPrice && (
+                                            <span className="text-lg text-gray-500 line-through ml-2">
+                                                ₹{plan.originalPrice}
+                                            </span>
+                                        )}
+                                        <p className="text-sm text-gray-600">
+                                            for {plan.months} month{plan.months > 1 ? 's' : ''}
+                                        </p>
+                                    </div>
+
+                                    <ul className="text-sm text-gray-600 mb-6 space-y-2">
+                                        {plan.features.map((feature, index) => (
+                                            <li key={index} className="flex items-center">
+                                                <svg className="w-4 h-4 text-emerald-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                </svg>
+                                                {feature}
+                                            </li>
+                                        ))}
+                                    </ul>
+
+                                    <button
+                                        onClick={() => handleSubscriptionPurchase(plan)}
+                                        disabled={isProcessingPayment || user.isPremium || !isRazorpayLoaded}
+                                        className={`w-full py-2 px-4 rounded-lg font-semibold transition-colors ${user.isPremium || !isRazorpayLoaded
+                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                : plan.popular
+                                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                            } ${isProcessingPayment && selectedPlan === plan.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
+                                        {!isRazorpayLoaded ? (
+                                            <div className="flex items-center justify-center">
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></div>
+                                                Loading Payment...
+                                            </div>
+                                        ) : isProcessingPayment && selectedPlan === plan.id ? (
+                                            <div className="flex items-center justify-center">
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                                Processing...
+                                            </div>
+                                        ) : user.isPremium ? (
+                                            'Already Subscribed'
+                                        ) : (
+                                            `Choose ${plan.name}`
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Features Info */}
+                    <div className="mt-8 p-4 rounded-lg bg-gray-50 border border-gray-200">
+                        <h4 className="text-lg font-semibold text-gray-800 mb-3">
+                            Premium Features Include:
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                            <div className="flex items-start">
+                                <svg className="w-5 h-5 text-emerald-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                <div>
+                                    <strong>Standard AI Analysis:</strong> Get detailed analysis of your code with standard AI models.
+                                </div>
+                            </div>
+                            <div className="flex items-start">
+                                <svg className="w-5 h-5 text-emerald-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                <div>
+                                    <strong>Advanced AI Analysis:</strong> Access to advanced AI models for deeper code insights.
+                                </div>
+                            </div>
+                            <div className="flex items-start">
+                                <svg className="w-5 h-5 text-emerald-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                <div>
+                                    <strong>Unlimited Test Cases:</strong> Generate unlimited test cases for all your projects.
+                                </div>
+                            </div>
+                            <div className="flex items-start">
+                                <svg className="w-5 h-5 text-emerald-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                <div>
+                                    <strong>Priority Support:</strong> Get faster response times for support requests.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
