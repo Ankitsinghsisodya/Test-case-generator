@@ -36,7 +36,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     .cookie("token", token, {
       sameSite: "lax",
       httpOnly: true,
-      secure: false,
+      secure: true,
     })
     .status(200)
     .json(new ApiResponse(200, token, "successfully login"));
@@ -102,7 +102,7 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
     .cookie("token", token, {
       sameSite: "lax",
       httpOnly: true,
-      secure: false,
+      secure: true,
     })
     .json(new ApiResponse(200, {}, "User successfully created"));
 });
@@ -350,7 +350,7 @@ export const githubCallback = asyncHandler(
         .cookie("token", jwttoken, {
           sameSite: "lax",
           httpOnly: true,
-          secure: false,
+          secure: true,
           maxAge: 1 * 24 * 60 * 60 * 1000,
         })
         .status(200)
