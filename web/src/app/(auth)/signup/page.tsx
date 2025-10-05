@@ -139,6 +139,28 @@ function SignupPage() {
         }
     };
 
+    const handleAuth = async (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+        event.preventDefault();
+        try {
+            setIsLoading(true);
+
+            // Get GitHub OAuth URL from your backend
+            const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/github/url`);
+            const { authUrl } = response.data.data;
+
+            // Redirect to GitHub OAuth
+            window.location.href = authUrl;
+        } catch (error: any) {
+            toast({
+                title: "Authentication Failed",
+                description: error.response?.data?.message || "Failed to initialize GitHub authentication",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
             <div className="max-w-md w-full space-y-8">
@@ -329,7 +351,7 @@ function SignupPage() {
                                 <div>
                                     <button
                                         type="button"
-                                        onClick={Auth}
+                                        onClick={handleGithubAuth}
                                         disabled={isLoading}
                                         className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 transition duration-150 ease-in-out disabled:opacity-50"
                                     >

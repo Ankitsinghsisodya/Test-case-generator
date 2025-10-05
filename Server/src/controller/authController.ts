@@ -34,7 +34,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   return res
     .cookie("token", token, {
-      sameSite: "none",
+      sameSite: "lax",
       httpOnly: true,
       secure: true,
     })
@@ -100,7 +100,7 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
   res
     .status(200)
     .cookie("token", token, {
-      sameSite: "none",
+      sameSite: "lax",
       httpOnly: true,
       secure: true,
     })
@@ -201,7 +201,7 @@ export const googleCallback = asyncHandler(
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           maxAge: 1 * 24 * 60 * 60 * 1000, // 7 days
-          sameSite: "none",
+          sameSite: "lax",
         })
         .redirect(`${process.env.CLIENT_URL}`);
     } catch (error) {
@@ -348,7 +348,7 @@ export const githubCallback = asyncHandler(
 
       return res
         .cookie("token", jwttoken, {
-          sameSite: "none",
+          sameSite: "lax",
           httpOnly: true,
           secure: true,
           maxAge: 1 * 24 * 60 * 60 * 1000,
@@ -367,8 +367,8 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
     .status(200)
     .clearCookie("token", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
+      secure: true,
+      sameSite: "lax",
     })
     .json(new ApiResponse(200, {}, "Logout successful"));
 });
