@@ -8,6 +8,8 @@ import { errorHandlingMiddleware } from "./middleware.ts/error.middleware.js";
 import authRoute from "./routes/auth.route.js";
 import userRoute from "./routes/user.route.js";
 import subsriptionRoute from "./routes/subscription.route.js";
+import testRoute from './routes/getTest.route.js'
+
 dotenv.config();
 
 const app = express();
@@ -17,7 +19,6 @@ app.use(cookieParser());
 
 // Body parsing middleware
 app.use(urlencoded({ extended: true }));
-app.use(express.json());
 
 // CORS configuration - allow credentials
 app.use(
@@ -26,11 +27,21 @@ app.use(
     credentials: true,
   })
 );
+app.use(
+  express.json({
+    // We need the raw body to verify webhook signatures.
+    // Let's compute it before Express parses the request body.
+    verify: (req: any, res, buf) => {
+      req.rawBody = buf.toString();
+    },
+  })
+);
+
+app.use("/api/subscription", subsriptionRoute);
 
 // Routes
 app.use("/api/auth", authRoute);
 app.use("/api/user", userRoute);
-app.use("/api/subscription", subsriptionRoute);
 
 // Error handling middleware should be last
 app.use(errorHandlingMiddleware);
@@ -41,7 +52,7 @@ app.get("/", (req: Request, res: Response) => {
   });
 });
 
-app.post("/getTestCase", getTestCase);
+app.use("/test", testRoute);
 app.listen(process.env.PORT, () => {
   console.log(`Server is listening on the ${process.env.PORT} PORT`);
 });

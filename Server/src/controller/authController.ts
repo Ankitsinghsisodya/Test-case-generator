@@ -8,6 +8,7 @@ import ApiResponse from "../utilities/ApiResponse.js";
 import asyncHandler from "../utilities/asynchandler.js";
 import { prisma } from "../utilities/prisma.js";
 import { sendEmail } from "../utilities/sendOTP.js";
+
 dotenv.config();
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;

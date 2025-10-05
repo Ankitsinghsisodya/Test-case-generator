@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 export default function Home() {
   const [code, setCode] = useState('')
   const [problemStatement, setProblemStatement] = useState('')
-  const [thinkingLevel, setThinkingLevel] = useState('standard')
+  const [thinkingLevel, setThinkingLevel] = useState('Standard')
   const [result, setResult] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -59,6 +59,18 @@ export default function Home() {
 
     fetchCurrentUser()
   }, [router, toast])
+
+  // Reset thinking level if non-premium user has premium option selected
+  useEffect(() => {
+    if (user && !user.isPremium && (thinkingLevel === 'Standard' || thinkingLevel === 'Advanced')) {
+      setThinkingLevel('Basic')
+      toast({
+        title: 'Thinking Level Reset',
+        description: 'Your thinking level has been reset to Basic. Upgrade to premium for advanced features.',
+        variant: 'default'
+      })
+    }
+  }, [user, thinkingLevel, toast])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -135,10 +147,12 @@ export default function Home() {
     setResult('')
 
     try {
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/getTestCase`, {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/test/getTestCase`, {
         code: code.trim(),
         problemStatement: problemStatement.trim(),
         thinkingLevel
+      }, {
+        withCredentials: true
       })
 
       if (response.data.testCase) {
@@ -217,7 +231,14 @@ export default function Home() {
                   className="w-8 h-8 rounded-full object-cover"
                 />
                 <div className="text-left hidden sm:block">
-                  <p className="text-sm font-medium text-emerald-800">{user.name || 'User'}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-emerald-800">{user.name || 'User'}</p>
+                    {user?.isPremium && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border border-amber-200">
+                        ⭐ Premium
+                      </span>
+                    )}
+                  </div>
                   {/* <p className="text-xs text-emerald-600">{user.email}</p> */}
                 </div>
                 <svg
@@ -317,17 +338,72 @@ export default function Home() {
               <label htmlFor="thinkingLevel" className="block text-sm font-semibold text-emerald-800 mb-3">
                 Thinking Level
               </label>
+
+              {/* Premium Status Info */}
+              {!user?.isPremium && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center text-amber-700">
+                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-sm font-medium">
+                      Standard and Advanced thinking require a premium subscription
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <select
                 id="thinkingLevel"
                 value={thinkingLevel}
-                onChange={(e) => setThinkingLevel(e.target.value)}
+                onChange={(e) => {
+                  // Prevent non-premium users from selecting premium options
+                  if (!user?.isPremium && (e.target.value === 'Standard' || e.target.value === 'Advanced')) {
+                    // Show premium upgrade message
+                    toast({
+                      title: 'Premium Required',
+                      description: 'Please upgrade to premium to use Standard and Advanced thinking levels.',
+                      variant: 'destructive'
+                    })
+                    return
+                  }
+                  setThinkingLevel(e.target.value)
+                }}
                 className="w-full px-4 py-3 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-gray-700"
                 disabled={isLoading}
               >
-                <option value="basic">Basic</option>
-                <option value="standard">Standard</option>
-                <option value="advanced">Advanced</option>
+                <option value="Basic">🆓 Basic (Free)</option>
+                <option
+                  value="Standard"
+                  disabled={!user?.isPremium}
+                  className={!user?.isPremium ? 'text-gray-400 bg-gray-100' : ''}
+                >
+                  {user?.isPremium ? '⭐ Standard (Premium)' : '🔒 Standard (Premium Required)'}
+                </option>
+                <option
+                  value="Advanced"
+                  disabled={!user?.isPremium}
+                  className={!user?.isPremium ? 'text-gray-400 bg-gray-100' : ''}
+                >
+                  {user?.isPremium ? '🚀 Advanced (Premium)' : '🔒 Advanced (Premium Required)'}
+                </option>
               </select>
+
+              {/* Premium Upgrade Button */}
+              {!user?.isPremium && (
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={() => router.push('/profile')}
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Upgrade to Premium
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-4">

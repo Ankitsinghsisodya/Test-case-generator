@@ -6,25 +6,25 @@ import { prisma } from "../utilities/prisma.js";
 import { SubscriptionStatus } from "@prisma/client";
 import ApiResponse from "../utilities/ApiResponse.js";
 
-export const handleRazorpayWebhook = asyncHandler(
-  async (req: Request, res: Response) => {
-    // console.log('req', req);
-    const signature = req.headers["x-razorpay-signature"] as string;
-      let body: Buffer;
-    if (Buffer.isBuffer(req.body)) {
-      body = req.body;
-    } else if (typeof req.body === "string") {
-      body = Buffer.from(req.body, "utf8");
-    } else {
-      // Worst-case fallback if req.body is parsed JSON (not ideal) — canonicalize
-      body = Buffer.from(JSON.stringify(req.body), "utf8");
-    }
 
+
+export const handleRazorpayWebhook = asyncHandler(
+  async (req: any, res: Response) => {
+
+
+    const signature = req.headers["x-razorpay-signature"] as string;
+   const webhookBody = req.rawBody; 
+    if (!signature) {
+      return res
+        .status(200)
+        .json(new ApiResponse(200, {}, "duplicate webhook"));
+    }
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET!)
-      .update(body)
+      .update(webhookBody, "utf8")
       .digest("hex");
-
+    console.log(`signature -> ${signature}`);
+    console.log(`expectedSignature -> ${expectedSignature}`);
     if (signature !== expectedSignature)
       throw new ApiError(400, "Invalid signature");
     const { event, payload } = req.body;
@@ -33,6 +33,8 @@ export const handleRazorpayWebhook = asyncHandler(
     } else {
       await handlePaymentFailed(payload);
     }
+    console.log("everhting all good");
+
     return res
       .status(200)
       .json(new ApiResponse(200, null, "Webhook processed successfully"));
@@ -40,10 +42,9 @@ export const handleRazorpayWebhook = asyncHandler(
 );
 
 const handlePaymentCaptured = async (payload: any) => {
-
   const payment = payload.payment.entity;
-  console.log('payload-payment',payload.payment);
-  const orderId = payment.order._id;
+  //   console.log("payload-payment", payload.payment);
+  const orderId = payment.order_id;
   const paymentId = payment.id;
   const amount = payment.amount / 100;
 
@@ -53,6 +54,7 @@ const handlePaymentCaptured = async (payload: any) => {
       select: {
         userId: true,
         id: true,
+        amount: true,
       },
     });
 
@@ -65,9 +67,9 @@ const handlePaymentCaptured = async (payload: any) => {
         id: subscription.id,
       },
       data: {
-        razorpayOrderId: paymentId,
+        razorpayPaymentId: paymentId,
         status: SubscriptionStatus.PAID,
-        // expiresAt: calculateExpiryDate(subscription.amount),
+        expiresAt: calculateExpiryDate(subscription.amount),
       },
     });
     await tx.user.update({
@@ -79,26 +81,24 @@ const handlePaymentCaptured = async (payload: any) => {
         premiumExpiresAt: updatedSubscription.expiresAt,
       },
     });
-
-
   });
+  console.log("verification done");
 };
 const handlePaymentFailed = async (payload: any) => {
-    const payment = payload.payment.entity;
-    const orderId = payment.order_id;
+  const payment = payload.payment.entity;
+  const orderId = payment.order_id;
 
-    await prisma.subscription.updateMany({
-        where:{razorpayOrderId:orderId},
-        data:{
-            status:SubscriptionStatus.FAILED
-        }
-    })
+  await prisma.subscription.updateMany({
+    where: { razorpayOrderId: orderId },
+    data: {
+      status: SubscriptionStatus.FAILED,
+    },
+  });
 };
 
-
 const calculateExpiryDate = (amount: number): Date => {
-    const expiresAt = new Date();
-    const months = amount/100;
-    expiresAt.setMonth(expiresAt.getMonth() + months)
-    return expiresAt;
-}
+  const expiresAt = new Date();
+  const months = amount / 100;
+  expiresAt.setMonth(expiresAt.getMonth() + months);
+  return expiresAt;
+};
