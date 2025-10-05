@@ -1,98 +1,136 @@
-
-import { fileURLToPath } from "url";
+import { exec } from "child_process";
+import { mkdir, unlink, writeFile } from "fs/promises";
 import path from "path";
+import { fileURLToPath } from "url";
+import { v4 as uuid } from "uuid";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// ...existing code...
-
-import { exec, spawn } from "child_process";
-import { writeFile, unlink, mkdir } from "fs/promises";
-
-import { v4 as uuid } from "uuid";
+const tempDir = path.join(__dirname, "temp");
 
 /**
- * Compiles and runs a C++ code string.
- * @param code The C++ code to execute.
- * @param input Optional standard input to be passed to the code.
- * @returns A promise that resolves to the standard output or an error message.
+ * Executes C++ code in a secure Docker container
+ * @param code The C++ code to execute
+ * @param input Optional standard input
+ * @returns Promise resolving to program output
  */
-const tempDir = path.join(__dirname, "temp");
 export const check = async (
   code: string,
   input: string = ""
 ): Promise<string> => {
-  
-  
   await mkdir(tempDir, { recursive: true });
   const jobId = uuid();
   const cppFilePath = path.join(tempDir, `${jobId}.cpp`);
-  const outputFilePath = path.join(tempDir, `${jobId}.out`);
+  const inputFilePath = path.join(tempDir, `${jobId}.input`);
+  const containerName = `cpp-runner-${jobId}`;
+
   try {
-
-    // 1. Ensure the temporary directory exists.
-
-    // 2. Write the C++ code to a temporary file.
+    // 1. Write C++ code to temporary file
     await writeFile(cppFilePath, code);
 
-    // 3. Compile the code using g++.
-    // We wrap the callback-based `exec` in a Promise for use with async/await.
-    await new Promise<void>((resolve, reject) => {
+    // 2. Write input to temporary file
+    await writeFile(inputFilePath, input);
 
-      exec(`g++ -O2 -std=c++17 -I /opt/homebrew/Cellar/gcc/14.2.0_1/include/c++/14/aarch64-apple-darwin24 "${cppFilePath}" -o "${outputFilePath}"`, (error, stdout, stderr) => {
-        if (error || stderr) {
-          reject(new Error(stderr || error?.message));
-        } else {
-          resolve();
-        }
-      });
-    });
+    // 3. Run C++ code in Docker container
+    const result = await runInDockerContainer(
+      containerName,
+      cppFilePath,
+      inputFilePath,
+      jobId
+    );
 
-    // 4. Run the compiled executable.
-    // We use `spawn` as it's better for handling streams (stdin, stdout, stderr).
-    return await new Promise<string>((resolve, reject) => {
-      const childProcess = spawn(outputFilePath);
-      let output = '';
-      let errorOutput = '';
-
-      // Set a timeout to kill the process if it runs for too long.
-      const timeout = setTimeout(() => {
-        childProcess.kill();
-        reject(new Error('Execution timed out after 5 seconds.'));
-      }, 5000);
-
-      childProcess.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-
-      childProcess.stderr.on('data', (data) => {
-        errorOutput += data.toString();
-      });
-
-      childProcess.on('close', () => {
-        clearTimeout(timeout);
-        // Resolve with the error output if it exists, otherwise resolve with standard output.
-        resolve(errorOutput || output);
-      });
-
-      childProcess.on('error', (err) => {
-        clearTimeout(timeout);
-        reject(err);
-      });
-
-      // Provide the input to the process.
-      childProcess.stdin.write(input);
-      childProcess.stdin.end();
-    });
-
+    return result;
   } catch (error: any) {
-    console.log("error", error);
-    // This catches errors from file writing, compilation, or execution timeout.
-    return error.message;
+    console.error("Docker execution error:", error);
+    return `Error: ${error.message}`;
   } finally {
-    // 5. Clean up temporary files, regardless of success or failure.
-    // We use empty catch blocks to ensure cleanup continues even if a file doesn't exist.
-    try { await unlink(cppFilePath); } catch {}
-    try { await unlink(outputFilePath); } catch {}
+    // 4. Cleanup temporary files and container
+    await cleanup(containerName, cppFilePath, inputFilePath);
   }
 };
+
+/**
+ * Runs C++ code in a Docker container with security restrictions
+ */
+async function runInDockerContainer(
+  containerName: string,
+  cppFilePath: string,
+  inputFilePath: string,
+  jobId: string
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // Docker command with security restrictions
+    const dockerCmd = [
+      "docker run",
+      `--name ${containerName}`,
+      "--rm",
+      "--memory=128m",
+      "--cpus=0.5",
+      "--security-opt no-new-privileges",
+      `-v "${cppFilePath}:/workspace/code.cpp:ro"`,
+      `-v "${inputFilePath}:/workspace/input.txt:ro"`,
+      "frolvlad/alpine-gxx:latest",
+      "sh",
+      "-c",
+      '"cp /workspace/code.cpp /tmp/code.cpp && cp /workspace/input.txt /tmp/input.txt && cd /tmp && g++ -O2 -std=c++17 -w code.cpp -o program && chmod +x program && timeout 3s ./program < input.txt"',
+    ].join(" ");
+
+    let output = "";
+    let errorOutput = "";
+
+    // Execute Docker command with timeout
+    const childProcess = exec(dockerCmd, {
+      timeout: 15000, // 15 second overall timeout
+      maxBuffer: 1024 * 1024, // 1MB output limit
+    });
+
+    childProcess.stdout?.on("data", (data) => {
+      output += data.toString();
+    });
+
+    childProcess.stderr?.on("data", (data) => {
+      errorOutput += data.toString();
+    });
+
+    childProcess.on("close", (code) => {
+      if (code === 0) {
+        resolve(output || "No output");
+      } else if (code === 124) {
+        // timeout exit code
+        resolve("Error: Execution timed out");
+      } else {
+        resolve(errorOutput || `Error: Process exited with code ${code}`);
+      }
+    });
+
+    childProcess.on("error", (err) => {
+      reject(new Error(`Docker execution failed: ${err.message}`));
+    });
+  });
+}
+
+/**
+ * Cleanup temporary files and Docker container
+ */
+async function cleanup(
+  containerName: string,
+  cppFilePath: string,
+  inputFilePath: string
+): Promise<void> {
+  // Force remove container if it still exists
+  try {
+    await new Promise<void>((resolve) => {
+      exec(`docker rm -f ${containerName}`, () => resolve());
+    });
+  } catch {
+    // Container might already be removed by --rm flag
+  }
+
+  // Remove temporary files
+  try {
+    await unlink(cppFilePath);
+  } catch {}
+  try {
+    await unlink(inputFilePath);
+  } catch {}
+}
