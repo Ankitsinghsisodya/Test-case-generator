@@ -211,7 +211,7 @@ export default function Home() {
     setCode("");
     setProblemStatement("");
     setResult("");
-    setThinkingLevel("standard");
+    setThinkingLevel("Standard");
   };
 
   // Show loading spinner while checking authentication
