@@ -95,7 +95,7 @@ export default function Profile() {
         const fetchCurrentUser = async () => {
             try {
                 const response = await axios.get(
-                    `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/user/getCurrentUser`,
+                    `api/user/getCurrentUser`,
                     {
                         withCredentials: true,
                     }
@@ -205,7 +205,7 @@ export default function Profile() {
             }
 
             const response = await axios.put(
-                `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/user/updateUserDetails`,
+                `api/user/updateUserDetails`,
                 formData,
                 {
                     withCredentials: true,
@@ -297,7 +297,7 @@ export default function Profile() {
         try {
             // Create order on backend
             const orderResponse = await axios.post(
-                `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/subscription/createOrder`,
+                `api/subscription/createOrder`,
                 {
                     month: plan.months,
                     currency: 'INR'
@@ -321,7 +321,7 @@ export default function Profile() {
                     try {
                         // Verify payment on backend
                         const verifyResponse = await axios.post(
-                            `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/subscription/verifyPayment`,
+                            `api/subscription/verifyPayment`,
                             {
                                 razorpay_order_id: response.razorpay_order_id,
                                 razorpay_payment_id: response.razorpay_payment_id,
