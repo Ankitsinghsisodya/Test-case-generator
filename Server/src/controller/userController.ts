@@ -9,7 +9,7 @@ import { prisma } from "../utilities/prisma.js";
 export const getCurrentUser = asyncHandler(
   async (req: Request, res: Response) => {
     const userId = req.id;
-
+    console.log('userId', userId);
     if (!userId) throw new ApiError(400, "User not found");
 
     // Get user with subscription information

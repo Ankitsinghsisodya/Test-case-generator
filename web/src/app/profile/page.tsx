@@ -98,6 +98,10 @@ export default function Profile() {
                     `api/user/getCurrentUser`,
                     {
                         withCredentials: true,
+                        headers: {
+                            'ngrok-skip-browser-warning': 'true',
+
+                        }
                     }
                 )
 
@@ -205,7 +209,7 @@ export default function Profile() {
             }
 
             const response = await axios.put(
-                `api/user/updateUserDetails`,
+                `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/user/updateUserDetails`,
                 formData,
                 {
                     withCredentials: true,
@@ -297,7 +301,7 @@ export default function Profile() {
         try {
             // Create order on backend
             const orderResponse = await axios.post(
-                `api/subscription/createOrder`,
+                `/api/subscription/createOrder`,
                 {
                     month: plan.months,
                     currency: 'INR'
@@ -319,35 +323,9 @@ export default function Profile() {
                 order_id: orderId,
                 handler: async function (response: any) {
                     try {
-                        // Verify payment on backend
-                        const verifyResponse = await axios.post(
-                            `api/subscription/verifyPayment`,
-                            {
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature
-                            },
-                            {
-                                withCredentials: true
-                            }
-                        )
-
-                        if (verifyResponse.status === 200) {
-                            toast({
-                                title: 'Payment Successful!',
-                                description: `You have successfully subscribed to the ${plan.name} plan.`,
-                                variant: 'default'
-                            })
-
-                            // Refresh user data to show premium status
-                            window.location.reload()
-                        }
+                        window.location.reload()
                     } catch (error: any) {
-                        toast({
-                            title: 'Payment Verification Failed',
-                            description: error.response?.data?.message || 'Please contact support.',
-                            variant: 'destructive'
-                        })
+                      
                     }
                 },
                 prefill: {
@@ -599,8 +577,8 @@ export default function Profile() {
                             <div
                                 key={plan.id}
                                 className={`relative rounded-lg border-2 p-6 ${plan.popular
-                                        ? 'border-emerald-500 bg-emerald-50'
-                                        : 'border-gray-200 bg-white'
+                                    ? 'border-emerald-500 bg-emerald-50'
+                                    : 'border-gray-200 bg-white'
                                     } hover:shadow-lg transition-shadow`}
                             >
                                 {plan.popular && (
@@ -645,10 +623,10 @@ export default function Profile() {
                                         onClick={() => handleSubscriptionPurchase(plan)}
                                         disabled={isProcessingPayment || user.isPremium || !isRazorpayLoaded}
                                         className={`w-full py-2 px-4 rounded-lg font-semibold transition-colors ${user.isPremium || !isRazorpayLoaded
-                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                : plan.popular
-                                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            : plan.popular
+                                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                                             } ${isProcessingPayment && selectedPlan === plan.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                         {!isRazorpayLoaded ? (

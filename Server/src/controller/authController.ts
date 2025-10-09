@@ -34,7 +34,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   return res
     .cookie("token", token, {
-      sameSite: "lax",
+      sameSite: "none",
       httpOnly: true,
       secure: true,
     })
@@ -100,7 +100,7 @@ export const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
   res
     .status(200)
     .cookie("token", token, {
-      sameSite: "lax",
+      sameSite: "none",
       httpOnly: true,
       secure: true,
     })

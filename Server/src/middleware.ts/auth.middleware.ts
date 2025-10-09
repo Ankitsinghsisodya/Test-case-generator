@@ -15,7 +15,9 @@ declare global{
 export const authMiddleware = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
 
+    console.log(req.cookies);
     const token = req.cookies.token;    
+    console.log('token', token);
 
     if (!token) throw new ApiError(401, "Unauthorized access");
     if (!process.env.JWT_SECRET_KEY)

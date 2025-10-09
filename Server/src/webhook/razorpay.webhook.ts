@@ -11,14 +11,15 @@ import ApiResponse from "../utilities/ApiResponse.js";
 export const handleRazorpayWebhook = asyncHandler(
   async (req: any, res: Response) => {
 
-
+    console.log('ankit is greate');
     const signature = req.headers["x-razorpay-signature"] as string;
    const webhookBody = req.rawBody; 
-    if (!signature) {
-      return res
-        .status(200)
-        .json(new ApiResponse(200, {}, "duplicate webhook"));
-    }
+   console.log('ankit',webhookBody);
+    // if (!signature) {
+    //   return res
+    //     .status(200)
+    //     .json(new ApiResponse(200, {}, "duplicate webhook"));
+    // }
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET!)
       .update(webhookBody, "utf8")

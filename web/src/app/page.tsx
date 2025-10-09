@@ -25,12 +25,15 @@ export default function Home() {
     const fetchCurrentUser = async () => {
       try {
         const response = await axios.get(
-          `api/user/getCurrentUser`,
+          `/api/user/getCurrentUser`,
           {
             withCredentials: true,
+            headers: {
+              'ngrok-skip-browser-warning': 'true',
+            },
           }
         );
-
+        console.log('reponse', response);
         if (response.status === 200 && response.data) {
           setUser(() => response.data.data);
         } else {
@@ -230,6 +233,7 @@ export default function Home() {
 
   // Only render main content if user is authenticated
   if (!user) {
+    console.log('ankit')
     return null; // This should not happen due to redirect, but just in case
   }
 
@@ -267,9 +271,8 @@ export default function Home() {
                   {/* <p className="text-xs text-emerald-600">{user.email}</p> */}
                 </div>
                 <svg
-                  className={`w-4 h-4 text-emerald-600 transition-transform ${
-                    showUserMenu ? "rotate-180" : ""
-                  }`}
+                  className={`w-4 h-4 text-emerald-600 transition-transform ${showUserMenu ? "rotate-180" : ""
+                    }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
